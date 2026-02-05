@@ -1,0 +1,72 @@
+// Demonstrates abstraction and encapsulation in a UPI payment application
+
+// Abstract class to hide internal payment processing
+abstract class UPIPayment {
+
+    // Abstract method for one-click payment
+    public abstract void sendMoney(double amount);
+}
+
+// Class that securely stores user account details
+class UserAccount {
+
+    // Private data members (cannot be accessed directly)
+    private String upiId;
+    private int pin;
+
+    // Constructor to initialize account details
+    public UserAccount(String upiId, int pin) {
+        this.upiId = upiId;
+        this.pin = pin;
+    }
+
+    // Authorized method to verify PIN
+    public boolean verifyPin(int enteredPin) {
+        return this.pin == enteredPin;
+    }
+
+    // Getter for UPI ID (PIN remains hidden)
+    public String getUpiId() {
+        return upiId;
+    }
+}
+
+// Concrete class implementing hidden payment logic
+class UPIPaymentService extends UPIPayment {
+
+    private UserAccount account;
+
+    // Constructor
+    public UPIPaymentService(UserAccount account) {
+        this.account = account;
+    }
+
+    // Implementation of abstract method
+    public void sendMoney(double amount) {
+        // Internal bank communication (hidden)
+        connectToBank();
+
+        // Simulated successful transfer
+        System.out.println("₹" + amount + " sent successfully!");
+    }
+
+    // Internal method hidden from user
+    private void connectToBank() {
+        System.out.println("Connecting securely to bank servers...");
+    }
+}
+
+// Main class
+public class UPIPaymentApp {
+    public static void main(String[] args) {
+
+        // Creating user account
+        UserAccount user = new UserAccount("david@upi", 1234);
+
+        // Creating UPI payment service
+        UPIPayment payment = new UPIPaymentService(user);
+
+        // One-click money transfer
+        payment.sendMoney(500.00);
+    }
+}
