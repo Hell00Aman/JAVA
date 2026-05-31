@@ -1,0 +1,131 @@
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Stack;
+
+/**
+ * Use Case 10: Booking Cancellation & Inventory Rollback
+ * * This class models a safe, predictable cancellation mechanism for a hotel booking system.
+ * It ensures inventory consistency and uses a Stack (LIFO) to manage released room rollbacks.
+ */
+public class UseCase10BookingCancellation {
+
+    // Mock Database / State Tables
+    private static Map<String, Booking> bookingRegistry = new HashMap<>();
+    private static Map<String, Integer> roomInventory = new HashMap<>();
+    
+    // Stack data structure utilized to track recently released room IDs for rollback operations
+    private static Stack<String> releasedRoomsRollbackStack = new Stack<>();
+
+    /**
+     * Inner class representing the Booking structure
+     */
+    static class Booking {
+        String bookingId;
+        String roomType;
+        String roomId;
+        String status; // "CONFIRMED" or "CANCELLED"
+
+        public Booking(String bookingId, String roomType, String roomId) {
+            this.bookingId = bookingId;
+            this.roomType = roomType;
+            this.roomId = roomId;
+            this.status = "CONFIRMED"; // Default state upon creation
+        }
+    }
+
+    /**
+     * Initializes the system with seed data for inventory and active bookings.
+     */
+    private static void initializeSystemData() {
+        // Initialize room type inventories
+        roomInventory.put("DELUXE", 3);
+        roomInventory.put("SUITE", 1);
+
+        // Seed some pre-existing confirmed bookings to test cancellations against
+        bookingRegistry.put("B_1001", new Booking("B_1001", "DELUXE", "RM-DELUXE-101"));
+        bookingRegistry.put("B_1002", new Booking("B_1002", "SUITE", "RM-SUITE-501"));
+        bookingRegistry.put("B_1003", new Booking("B_1003", "DELUXE", "RM-DELUXE-102"));
+    }
+
+    /**
+     * Cancels an existing booking and safely rolls back the inventory state.
+     * * @param bookingId The ID of the reservation to cancel.
+     * @return boolean True if cancellation and rollback succeeded, false otherwise.
+     */
+    public static synchronized boolean cancelBooking(String bookingId) {
+        System.out.println("\n[PROCESS] Initiating cancellation request for Booking ID: " + bookingId);
+
+        // 1. Validation: Verify that the reservation exists
+        if (!bookingRegistry.containsKey(bookingId)) {
+            System.out.println("[ERROR] Cancellation Failed: Booking ID " + bookingId + " does not exist.");
+            return false;
+        }
+
+        Booking booking = bookingRegistry.get(bookingId);
+
+        // 2. Validation: Prevent cancellation of already cancelled bookings
+        if ("CANCELLED".equals(booking.status)) {
+            System.out.println("[ERROR] Cancellation Failed: Booking ID " + bookingId + " is already cancelled.");
+            return false;
+        }
+
+        // 3. Record Room ID in the Rollback Structure
+        // Tracking released allocations using Stack (LIFO behavior)
+        releasedRoomsRollbackStack.push(booking.roomId);
+        System.out.println("[ROLLBACK] Room ID " + booking.roomId + " pushed to rollback stack.");
+
+        // 4. Controlled Mutation: Execute rollbacks in strict, predefined order
+        // Step A: Pop room from stack to process restoration
+        String roomToRestore = releasedRoomsRollbackStack.pop();
+        
+        // Step B: Increment Inventory counts immediately
+        int currentInventory = roomInventory.getOrDefault(booking.roomType, 0);
+        roomInventory.put(booking.roomType, currentInventory + 1);
+        System.out.println("[INVENTORY] Restored 1 slot for " + booking.roomType + ". New count: " + (currentInventory + 1));
+
+        // Step C: Update booking history state to reflect the cancellation
+        booking.status = "CANCELLED";
+        System.out.println("[STATUS] Booking ID " + bookingId + " state updated to CANCELLED.");
+
+        System.out.println("[SUCCESS] Cancellation and state rollback completed for " + bookingId);
+        return true;
+    }
+
+    /**
+     * Utility method to print current global state matrices.
+     */
+    private static void printCurrentSystemState() {
+        System.out.println("\n============= CURRENT SYSTEM STATE =============");
+        System.out.println("Room Inventories: " + roomInventory);
+        System.out.println("Active/Cancelled Registry Status:");
+        bookingRegistry.forEach((id, booking) -> 
+            System.out.println("  - " + id + " | Room: " + booking.roomId + " | Status: " + booking.status)
+        );
+        System.out.println("================================================");
+    }
+
+    /**
+     * Execution Entry Point
+     */
+    public static void main(String[] args) {
+        System.out.println("Initializing Book My Stay App: Use Case 10 System Environment...");
+        initializeSystemData();
+        printCurrentSystemState();
+
+        // Test Scenario 1: Successful cancellation and inventory recovery
+        cancelBooking("B_1001");
+        printCurrentSystemState();
+
+        // Test Scenario 2: Alternative room type successful cancellation
+        cancelBooking("B_1002");
+        printCurrentSystemState();
+
+        // Test Scenario 3: Rejecting a duplicate cancellation request
+        cancelBooking("B_1001");
+
+        // Test Scenario 4: Rejecting a non-existent reservation ID
+        cancelBooking("B_9999");
+        
+        printCurrentSystemState();
+    }
+}
